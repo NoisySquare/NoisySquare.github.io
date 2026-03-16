@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Train · Japan</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- date-fns (optional) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/date-fns/2.30.0/date_fns.min.js"></script>
+    <!-- Papa Parse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- Our styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Dynamic views will be injected here -->
+    </div>
+
+    <!-- Templates (hidden) -->
+    <template id="dashboard-template">
+    <div class="container dashboard">
+        <!-- Greeting -->
+        <div class="greeting">
+        <h1>Good <span id="greeting-time">Morning</span>, <span id="user-name">Traveller</span>!</h1>
+        </div>
+
+        <!-- Two‑column top row: Metrics + Calendar Heatmap -->
+        <div class="top-row">
+        <!-- Metrics -->
+        <div class="metrics-card">
+            <div class="metric-item">
+            <i class="fas fa-clock metric-icon"></i>
+            <div>
+                <span class="metric-label">Total study time</span>
+                <span class="metric-value" id="total-time-global">0 min</span>
+            </div>
+            </div>
+            <div class="metric-item">
+            <i class="fas fa-route metric-icon"></i>
+            <div>
+                <span class="metric-label">Distance traveled</span>
+                <span class="metric-value" id="total-distance-global">0 km</span>
+            </div>
+            </div>
+            <div class="metric-item">
+            <i class="fas fa-fire metric-icon"></i>
+            <div>
+                <span class="metric-label">Current streak</span>
+                <span class="metric-value" id="streak">0 days</span>
+            </div>
+            </div>
+        </div>
+
+        <!-- Calendar Heatmap -->
+        <div class="calendar-card">
+            <h3><i class="fas fa-calendar-alt"></i> Activity</h3>
+            <div class="heatmap" id="heatmap">
+            <!-- JS will fill squares -->
+            </div>
+        </div>
+        </div>
+
+        <!-- Day Log Section (for selected date) -->
+        <div class="daylog-section">
+        <div class="daylog-header">
+            <h2><i class="fas fa-clipboard-list"></i> Day log · <span id="selected-date-display">Today</span></h2>
+            <div class="daylog-totals">
+            <span>Total: <strong id="today-time">0 min</strong></span>
+            <span>Distance: <strong id="today-distance">0 km</strong></span>
+            </div>
+        </div>
+
+        <div class="daylog-grid">
+            <!-- Timeline (left) -->
+            <div class="timeline-container" id="timeline">
+            <p class="empty-message">No sessions on this day</p>
+            </div>
+
+            <!-- Interactive Map (right) -->
+            <div class="map-container" id="daily-map"></div>
+        </div>
+        </div>
+
+        <!-- Travel Now Button -->
+        <button class="travel-now-btn" id="travel-now">
+        <i class="fas fa-train"></i> Travel now
+        </button>
+    <!-- Clear All Data Button -->
+        <button class="clear-data-btn" id="clear-data"><i class="fas fa-trash-alt"></i> Clear All Data</button>
+    </div>
+    </template>
+
+    <template id="travel-modal-template">
+        <div class="modal-overlay" id="modal-overlay">
+            <div class="modal-content">
+                <h2>Plan your trip <i class="fas fa-map-marked-alt"></i></h2>
+                <div class="modal-body">
+                    <div class="line-list" id="line-list">
+                        <!-- line items will be injected -->
+                    </div>
+                    <div class="preview-map" id="preview-map"></div>
+                </div>
+                <div class="modal-actions">
+                    <input type="text" id="trip-goal" placeholder="What do you want to accomplish? (optional)">
+                    <button id="go-button" class="go-btn" disabled>Go!</button>
+                    <button id="close-modal" class="close-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+<template id="study-template">
+  <div class="study-container">
+    <!-- Video background -->
+    <div id="youtube-player" class="video-background"></div>
+    <!-- Transparent wall -->
+    <div class="video-wall"></div>
+    
+    <!-- Overlay UI -->
+    <div class="study-overlay">
+      <!-- Volume control -->
+      <div class="volume-control">
+        <i class="fas fa-volume-up"></i>
+        <input type="range" id="volume-slider" min="0" max="100" value="50">
+      </div>
+
+      <!-- Left column -->
+      <div class="left-panel">
+        <div class="timer-card glass">
+          <div class="timer-display" id="study-timer">00:00:00</div>
+          <div class="distance-display">
+            <i class="fas fa-route"></i> <span id="trip-dist">0.0</span> km
+          </div>
+          <div class="timer-controls">
+            <button id="play-pause-btn"><i class="fas fa-play"></i> <span>Start</span></button>
+            <button id="complete-btn"><i class="fas fa-check"></i> Complete</button>
+            <button id="study-reset"><i class="fas fa-undo-alt"></i> Reset</button>
+          </div>
+        </div>
+        <div class="todo-card glass">
+          <div class="todo-header">TO-DO</div>
+          <div class="todo-list" id="todo-list"></div>
+          <div class="todo-input">
+            <input type="text" id="new-todo" placeholder="Add a task...">
+            <button id="add-todo">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="right-panel">
+        <div class="map-card glass">
+          <div id="study-map" class="mini-map"></div>
+        </div>
+        <div class="status-card glass">
+          <div class="station-names">
+            <span class="current-station" id="current-station">—</span>
+            <span class="arrow">→</span>
+            <span class="next-station" id="next-station">—</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="route-card glass" id="route-line"></div>
+      </div>
+
+      <!-- Back button -->
+      <button id="back-to-dashboard" class="back-btn"><i class="fas fa-arrow-left"></i></button>
+    </div>
+  </div>
+</template>
+
+    <!-- Confetti library for celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+    <!-- Our main script -->
+    <script src="main.js"></script>
+
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('This app must be served via HTTP to load line data.\n\nPlease use the provided run script (run.command / run.bat) or run:\n\npython3 -m http.server 8000\n\nThen open http://localhost:8000');
+        }
+    </script>
+
+
+</body>
+</html>
